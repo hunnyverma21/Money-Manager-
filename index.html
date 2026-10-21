@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="A simple personal money manager to track income, expenses, and your balance." />
+  <title>Money Manager</title>
+  <style>
+    :root {
+      --bg: #f4f7fb; --panel: #ffffff; --text: #172033; --muted: #6b7280;
+      --green: #16845b; --red: #d84a4a; --blue: #3157d5; --border: #e5e9f2;
+      --shadow: 0 8px 28px rgba(24, 39, 75, .07);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; background: var(--bg); color: var(--text); }
+    .wrap { max-width: 1100px; margin: auto; padding: 28px 18px 50px; }
+    header { display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:24px; }
+    .brand { display:flex; align-items:center; gap:12px; }
+    .logo { width:46px; height:46px; display:grid; place-items:center; border-radius:14px; color:white; background:linear-gradient(135deg,#3157d5,#6d5ce8); font-size:24px; font-weight:800; }
+    h1 { margin:0; font-size:clamp(1.5rem, 3vw, 2rem); letter-spacing:-.04em; }
+    .sub { margin:4px 0 0; color:var(--muted); font-size:.93rem; }
+    button, input, select { font:inherit; }
+    button { cursor:pointer; border:0; border-radius:10px; padding:11px 15px; font-weight:700; transition:transform .12s, opacity .12s; }
+    button:active { transform:scale(.98); }
+    .primary { color:#fff; background:var(--blue); }
+    .secondary { color:var(--text); background:#edf0f7; }
+    .danger { color:var(--red); background:#fff0f0; padding:7px 10px; }
+    .summary { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:20px; }
+    .card { background:var(--panel); border:1px solid var(--border); border-radius:18px; padding:20px; box-shadow:var(--shadow); min-width:0; }
+    .label { color:var(--muted); font-size:.9rem; margin-bottom:10px; }
+    .amount { font-size:clamp(1.45rem, 3vw, 2rem); font-weight:800; letter-spacing:-.04em; overflow-wrap:anywhere; }
+    .amount.income { color:var(--green); } .amount.expense { color:var(--red); }
+    .content { display:grid; grid-template-columns: minmax(280px, .8fr) minmax(0, 1.5fr); gap:20px; align-items:start; }
+    h2 { font-size:1.1rem; margin:0 0 18px; }
+    .field { margin-bottom:14px; }
+    label { display:block; margin-bottom:7px; color:var(--muted); font-size:.88rem; font-weight:650; }
+    input, select { width:100%; padding:11px 12px; border:1px solid var(--border); border-radius:10px; background:#fff; color:var(--text); outline:none; }
+    input:focus, select:focus { border-color:#8194ee; box-shadow:0 0 0 3px rgba(49,87,213,.1); }
+    .form-actions { display:flex; gap:10px; }
+    .form-actions button { flex:1; }
+    .toolbar { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+    .toolbar input { flex:1; min-width:150px; }
+    .toolbar select { width:auto; min-width:135px; }
+    .table-wrap { overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; min-width:570px; }
+    th, td { padding:13px 10px; border-bottom:1px solid var(--border); text-align:left; font-size:.91rem; }
+    th { color:var(--muted); font-size:.8rem; text-transform:uppercase; letter-spacing:.04em; }
+    td:last-child, th:last-child { text-align:right; }
+    .type-pill { display:inline-block; border-radius:99px; padding:5px 9px; font-size:.78rem; font-weight:750; }
+    .pill-income { background:#e4f7ee; color:var(--green); } .pill-expense { background:#fff0f0; color:var(--red); }
+    .empty { padding:35px 12px; text-align:center; color:var(--muted); }
+    .foot { color:var(--muted); text-align:center; margin-top:22px; font-size:.82rem; }
+    .notice { display:none; margin-bottom:14px; padding:10px 12px; border-radius:10px; background:#fff7dd; color:#7c5b00; font-size:.9rem; }
+    @media (max-width: 760px) { .summary { grid-template-columns:1fr; gap:12px; } .content { grid-template-columns:1fr; } .card { padding:17px; } }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <div class="brand">
+        <div class="logo">₹</div>
+        <div><h1>Money Manager</h1><p class="sub">Know where your money goes.</p></div>
+      </div>
+      <button class="secondary" id="exportBtn">Export CSV ↓</button>
+    </header>
+
+    <section class="summary" aria-label="Money summary">
+      <article class="card"><div class="label">Current Balance</div><div class="amount" id="balance">₹0.00</div></article>
+      <article class="card"><div class="label">Total Income</div><div class="amount income" id="incomeTotal">₹0.00</div></article>
+      <article class="card"><div class="label">Total Expenses</div><div class="amount expense" id="expenseTotal">₹0.00</div></article>
+    </section>
+
+    <div class="content">
+      <section class="card">
+        <h2 id="formTitle">Add a transaction</h2>
+        <div class="notice" id="notice" role="status"></div>
+        <form id="transactionForm">
+          <div class="field"><label for="title">Description</label><input id="title" maxlength="80" placeholder="e.g. Monthly allowance" required /></div>
+          <div class="field"><label for="amount">Amount (₹)</label><input id="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required /></div>
+          <div class="field"><label for="type">Transaction type</label><select id="type"><option value="income">Income</option><option value="expense" selected>Expense</option></select></div>
+          <div class="field"><label for="category">Category</label><select id="category"><option>Food</option><option>Transport</option><option>Shopping</option><option>Education</option><option>Bills</option><option>Health</option><option>Salary</option><option>Allowance</option><option>Entertainment</option><option>Other</option></select></div>
+          <div class="field"><label for="date">Date</label><input id="date" type="date" required /></div>
+          <div class="form-actions"><button class="primary" type="submit" id="saveBtn">Add transaction</button><button class="secondary" type="button" id="cancelEdit" hidden>Cancel</button></div>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Transaction history</h2>
+        <div class="toolbar">
+          <input id="search" type="search" placeholder="Search transactions..." aria-label="Search transactions" />
+          <select id="filterType" aria-label="Filter transaction type"><option value="all">All types</option><option value="income">Income</option><option value="expense">Expenses</option></select>
+          <select id="filterCategory" aria-label="Filter category"><option value="all">All categories</option><option>Food</option><option>Transport</option><option>Shopping</option><option>Education</option><option>Bills</option><option>Health</option><option>Salary</option><option>Allowance</option><option>Entertainment</option><option>Other</option></select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Type</th><th>Amount</th><th>Action</th></tr></thead>
+            <tbody id="transactionRows"></tbody>
+          </table>
+          <div class="empty" id="emptyState">No transactions yet. Add your first income or expense.</div>
+        </div>
+      </section>
+    </div>
+    <p class="foot">Your transactions are saved in this browser on this device. Export a CSV backup regularly.</p>
+  </main>
+
+  <script>
+    const STORAGE_KEY = "moneyManagerTransactions_v1";
+    const $ = (id) => document.getElementById(id);
+    let transactions = loadTransactions();
+    let editingId = null;
+
+    function loadTransactions() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+        return Array.isArray(saved) ? saved : [];
+      } catch { return []; }
+    }
+    function saveTransactions() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+      } catch {
+        showNotice("Could not save data in this browser. Please check browser storage settings.");
+      }
+    }
+    function money(value) {
+      return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(value);
+    }
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, ch => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[ch]));
+    }
+    function showNotice(message) {
+      $("notice").textContent = message;
+      $("notice").style.display = "block";
+      window.setTimeout(() => { $("notice").style.display = "none"; }, 3200);
+    }
+    function render() {
+      const income = transactions.filter(t => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
+      const expenses = transactions.filter(t => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
+      $("balance").textContent = money(income - expenses);
+      $("incomeTotal").textContent = money(income);
+      $("expenseTotal").textContent = money(expenses);
+      $("balance").className = "amount " + (income - expenses < 0 ? "expense" : "");
+
+      const query = $("search").value.trim().toLowerCase();
+      const type = $("filterType").value;
+      const category = $("filterCategory").value;
+      const filtered = transactions.filter(t =>
+        (t.title.toLowerCase().includes(query) || t.category.toLowerCase().includes(query)) &&
+        (type === "all" || t.type === type) &&
+        (category === "all" || t.category === category)
+      ).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+
+      $("transactionRows").innerHTML = filtered.map(t => `
+        <tr>
+          <td>${escapeHtml(t.date)}</td>
+          <td>${escapeHtml(t.title)}</td>
+          <td>${escapeHtml(t.category)}</td>
+          <td><span class="type-pill ${t.type === "income" ? "pill-income" : "pill-expense"}">${t.type === "income" ? "Income" : "Expense"}</span></td>
+          <td style="font-weight:750;color:${t.type === "income" ? "var(--green)" : "var(--red)"}">${t.type === "income" ? "+" : "−"}${money(t.amount)}</td>
+          <td><button class="secondary" data-edit="${t.id}" aria-label="Edit ${escapeHtml(t.title)}" style="padding:7px 9px">Edit</button> <button class="danger" data-delete="${t.id}" aria-label="Delete ${escapeHtml(t.title)}">Delete</button></td>
+        </tr>`).join("");
+      $("emptyState").style.display = filtered.length ? "none" : "block";
+    }
+
+    $("date").value = new Date().toISOString().slice(0, 10);
+    $("transactionForm").addEventListener("submit", event => {
+      event.preventDefault();
+      const title = $("title").value.trim();
+      const amount = Number($("amount").value);
+      const date = $("date").value;
+      if (!title || !Number.isFinite(amount) || amount <= 0 || !date) {
+        showNotice("Enter a description, a positive amount, and a valid date.");
+        return;
+      }
+      const data = { title, amount: Math.round(amount * 100) / 100, type: $("type").value, category: $("category").value, date };
+      if (editingId !== null) {
+        transactions = transactions.map(t => t.id === editingId ? { ...t, ...data } : t);
+        showNotice("Transaction updated.");
+      } else {
+        transactions.push({ ...data, id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random())), createdAt: Date.now() });
+      }
+      saveTransactions();
+      resetForm();
+      render();
+    });
+
+    function resetForm() {
+      editingId = null;
+      $("transactionForm").reset();
+      $("date").value = new Date().toISOString().slice(0, 10);
+      $("type").value = "expense";
+      $("formTitle").textContent = "Add a transaction";
+      $("saveBtn").textContent = "Add transaction";
+      $("cancelEdit").hidden = true;
+    }
+    $("cancelEdit").addEventListener("click", resetForm);
+
+    $("transactionRows").addEventListener("click", event => {
+      const editButton = event.target.closest("[data-edit]");
+      const deleteButton = event.target.closest("[data-delete]");
+      if (editButton) {
+        const t = transactions.find(item => item.id === editButton.dataset.edit);
+        if (!t) return;
+        editingId = t.id;
+        $("title").value = t.title;
+        $("amount").value = t.amount;
+        $("type").value = t.type;
+        $("category").value = t.category;
+        $("date").value = t.date;
+        $("formTitle").textContent = "Edit transaction";
+        $("saveBtn").textContent = "Save changes";
+        $("cancelEdit").hidden = false;
+        $("title").focus();
+      }
+      if (deleteButton) {
+        const t = transactions.find(item => item.id === deleteButton.dataset.delete);
+        if (t && confirm(`Delete "${t.title}"? This cannot be undone.`)) {
+          transactions = transactions.filter(item => item.id !== t.id);
+          if (editingId === t.id) resetForm();
+          saveTransactions();
+          render();
+        }
+      }
+    });
+    ["search", "filterType", "filterCategory"].forEach(id => $(id).addEventListener(id === "search" ? "input" : "change", render));
+
+    $("exportBtn").addEventListener("click", () => {
+      if (!transactions.length) { showNotice("There are no transactions to export yet."); return; }
+      const rows = [["Date", "Description", "Type", "Category", "Amount"], ...transactions.map(t => [t.date, t.title, t.type, t.category, t.amount])];
+      const csv = rows.map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url; link.download = "money-manager-transactions.csv"; link.click();
+      URL.revokeObjectURL(url);
+    });
+
+    render();
+  </script>
+</body>
+</html>
